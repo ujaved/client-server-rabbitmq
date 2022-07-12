@@ -1,0 +1,56 @@
+[
+    {
+        "Operation": "AddItem",
+        "Items": [
+            {
+                "Key": "A"
+            }
+        ]
+    },
+    {
+        "Operation": "AddItem",
+        "Items": [
+            {
+                "Key": "B"
+            }
+        ]
+    },
+    {
+        "Operation": "AddItem",
+        "Items": [
+            {
+                "Key": "D"
+            }
+        ]
+    },
+    {
+        "Operation": "AddItem",
+        "Items": [
+            {
+                "Key": "E"
+            }
+        ]
+    },
+    {
+        "Operation": "AddItem",
+        "Items": [
+            {
+                "Key": "C"
+            }
+        ]
+    },
+    {
+        "Operation": "GetAllItems"
+    },
+    {
+        "Operation": "RemoveItem",
+        "Items": [
+            {
+                "Key": "D"
+            }
+        ]
+    },
+    {
+        "Operation": "GetAllItems"
+    }
+]

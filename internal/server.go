@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/google/uuid"
@@ -16,23 +17,30 @@ import (
 // a file to write output to, and the queue state
 type Server struct {
 	id           string
+	rw           sync.RWMutex
 	clientStream map[string]struct {
 		c chan api.Request
 		*Data
 	}
-	outFile *os.File
-	Qs      *QueueState
+	outFile    *os.File
+	outChannel chan api.Output
+	Qs         *QueueState
 }
 
 func NewServer(username, password, queueName string, port int, outFile *os.File) *Server {
 	serv := &Server{
 		id: uuid.New().String(),
+		rw: sync.RWMutex{},
 		clientStream: map[string]struct {
 			c chan api.Request
 			*Data
 		}{},
-		outFile: outFile,
+		outFile:    outFile,
+		outChannel: make(chan api.Output),
 	}
+
+	// start go routine for file writer
+	go serv.writeDataToFile()
 
 	qs, err := InitQueue(username, password, queueName, port)
 	if err != nil {
@@ -52,6 +60,7 @@ func (serv *Server) Start() {
 	go func() {
 		<-c
 		serv.SafeClose()
+		os.Exit(1)
 	}()
 
 	msgs, err := serv.Qs.Channel.Consume(serv.Qs.Queue.Name, "", true, false, false, false, nil)
@@ -81,7 +90,9 @@ func (serv *Server) parseAndRouteRequest(reqBody []byte) {
 	if err != nil {
 		log.Panicf("failed to parse request: %v", err)
 	}
+	serv.rw.RLock()
 	cs, ok := serv.clientStream[req.ClientId]
+	serv.rw.RUnlock()
 	if !ok {
 		cs = struct {
 			c chan api.Request
@@ -90,7 +101,9 @@ func (serv *Server) parseAndRouteRequest(reqBody []byte) {
 			make(chan api.Request),
 			NewData(),
 		}
+		serv.rw.Lock()
 		serv.clientStream[req.ClientId] = cs
+		serv.rw.Unlock()
 		go serv.processRequest(cs.c)
 	}
 	cs.c <- req
@@ -98,7 +111,9 @@ func (serv *Server) parseAndRouteRequest(reqBody []byte) {
 
 func (serv *Server) processRequest(c chan api.Request) {
 	for req := range c {
+		serv.rw.RLock()
 		d := serv.clientStream[req.ClientId].Data
+		serv.rw.RUnlock()
 		switch req.Operation {
 		case "AddItem":
 			if len(req.Items) > 0 {
@@ -119,10 +134,7 @@ func (serv *Server) processRequest(c chan api.Request) {
 				Operation: req.Operation,
 				Items:     items,
 			}
-			err := WriteDataToFile(output, serv.outFile)
-			if err != nil {
-				log.Panicf("failed to write to file: %v", err)
-			}
+			serv.outChannel <- output
 		case "GetAllItems":
 			output := api.Output{
 				RequestId: req.RequestId,
@@ -130,12 +142,24 @@ func (serv *Server) processRequest(c chan api.Request) {
 				Operation: req.Operation,
 				Items:     d.GetAllItems(),
 			}
-			err := WriteDataToFile(output, serv.outFile)
-			if err != nil {
-				log.Panicf("failed to write to file: %v", err)
-			}
+			serv.outChannel <- output
 		default:
 			log.Panicf("unknown operation: %s", req.Operation)
+		}
+	}
+}
+
+func (serv *Server) writeDataToFile() {
+	for output := range serv.outChannel {
+		data, err := json.Marshal(output)
+		if err != nil {
+			log.Fatalf("failed to serialize output: %v", err)
+		}
+		if _, err := serv.outFile.Write(data); err != nil {
+			log.Fatalf("failed to write to file: %v", err)
+		}
+		if _, err := serv.outFile.Write([]byte("\n")); err != nil {
+			log.Fatalf("failed to write to file: %v", err)
 		}
 	}
 }

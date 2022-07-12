@@ -22,6 +22,9 @@ type testSpec struct {
 
 var caps = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var TEST_OUTPUT_FILE = "test_output.json"
+var NUM_CLIENTS = 5
+var NUM_REQUESTS_PER_CLIENT = 100
+var TEST_DELAY_SECS = 3
 
 func TestClientServer(t *testing.T) {
 
@@ -33,8 +36,11 @@ func TestClientServer(t *testing.T) {
 	}
 
 	// remove the test file if it exists already
-	if err := os.Remove(TEST_OUTPUT_FILE); err != nil {
-		log.Panicf("failed to remove existing test file: %v", err)
+	err = os.Remove(TEST_OUTPUT_FILE)
+	if err != nil {
+		if _, ok := err.(*os.PathError); !ok {
+			log.Panicf("failed to remove existing test file: %v", err)
+		}
 	}
 	f, err := os.OpenFile(TEST_OUTPUT_FILE, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -45,12 +51,10 @@ func TestClientServer(t *testing.T) {
 	defer server.SafeClose()
 	server.Start()
 
-	numClients := 5
-	numRequestsPerClient := 50
 	testSpecs := map[string][]testSpec{}
-	for i := 0; i < numClients; i++ {
+	for i := 0; i < NUM_CLIENTS; i++ {
 		clientId := uuid.New().String()
-		testSpecs[clientId] = generateRequests(clientId, numRequestsPerClient)
+		testSpecs[clientId] = generateRequests(clientId, NUM_REQUESTS_PER_CLIENT)
 	}
 
 	for c, tss := range testSpecs {
@@ -63,7 +67,7 @@ func TestClientServer(t *testing.T) {
 	}
 
 	// check the output after a delay
-	time.Sleep(10 * time.Second)
+	time.Sleep(time.Duration(TEST_DELAY_SECS) * time.Second)
 
 	testOutputs := map[string][]api.Output{}
 	file, err := os.Open(TEST_OUTPUT_FILE)

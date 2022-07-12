@@ -22,5 +22,6 @@ func main() {
 	defer serv.SafeClose()
 	serv.Start()
 
-	// ctrl-c safe close
+	ch := make(chan struct{})
+	<-ch
 }

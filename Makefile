@@ -7,17 +7,20 @@ export QUEUE_NAME := bloxroute
 export USERNAME := guest
 export PASSWORD := guest
 export CLIENT_INPUT_FILENAME := input.json
+export SERVER_OUTPUT_FILENAME := output.json
 
 .PHONY: client
 client:
 	go run cmd/client/main.go
-	$(GOPATH)/bin/client
-
 
 .PHONY: server
 server:
 	go run cmd/server/main.go
-	$(GOPATH)/bin/server
+
+.PHONY: test
+test:
+	go clean -testcache
+	go test -v ./... -race
 
 
 .PHONY: build-env

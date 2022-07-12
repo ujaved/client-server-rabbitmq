@@ -51,6 +51,7 @@ func (client *Client) Start() {
 	go func() {
 		<-c
 		client.SafeClose()
+		os.Exit(1)
 	}()
 
 	requestId := 1

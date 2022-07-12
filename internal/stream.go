@@ -3,9 +3,6 @@ package internal
 import (
 	"client-server-rabbitmq/api"
 	"container/list"
-	"encoding/json"
-	"fmt"
-	"os"
 )
 
 // Data represents the queue belonging to a client.
@@ -60,18 +57,4 @@ func (d *Data) GetAllItems() []api.Item {
 		rv = append(rv, e.Value.(api.Item))
 	}
 	return rv
-}
-
-func WriteDataToFile(output api.Output, f *os.File) error {
-	data, err := json.Marshal(output)
-	if err != nil {
-		return fmt.Errorf("failed to serialize output: %w", err)
-	}
-	if _, err := f.Write(data); err != nil {
-		return fmt.Errorf("failed to write to file: %w", err)
-	}
-	if _, err := f.Write([]byte("\n")); err != nil {
-		return fmt.Errorf("failed to write to file: %w", err)
-	}
-	return nil
 }
